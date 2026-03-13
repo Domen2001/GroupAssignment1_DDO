@@ -1,3 +1,5 @@
+# Ilya Muradin, Ashkan Tavallali & Doomen van Soest
+
 import pandas as pd
 import gurobipy as gp
 from gurobipy import GRB
@@ -11,9 +13,6 @@ BIG_M = 200
 
 
 def get_orientations(l, w, h):
-    """
-    Returns all unique rotations of one item.
-    """
     return list(set(permutations([l, w, h], 3)))
 
 
@@ -50,20 +49,16 @@ def load_instance_data(excel_file, sheet_name, instance_number=None):
 
 
 def build_and_solve_model(df, instance_name="Instance"):
-    # Convert dataframe to list of dicts for easier access
     items = df.to_dict("records")
     n = len(items)
 
     model = gp.Model(instance_name)
-
-    # -- Decision variables --
 
     # Suitcase dimensions
     L = model.addVar(vtype=GRB.INTEGER, lb=1, ub=SIZE_SUM_LIMIT, name="L")
     W = model.addVar(vtype=GRB.INTEGER, lb=1, ub=SIZE_SUM_LIMIT, name="W")
     H = model.addVar(vtype=GRB.INTEGER, lb=1, ub=SIZE_SUM_LIMIT, name="H")
 
-    # Binary: take item i or not
     take = model.addVars(n, vtype=GRB.BINARY, name="take")
 
     # Position of lower-left-bottom corner
@@ -100,8 +95,6 @@ def build_and_solve_model(df, instance_name="Instance"):
         gp.quicksum(items[i]["value"] * take[i] for i in range(n)),
         GRB.MAXIMIZE
     )
-
-    # --Constraints--
 
     # Weight limit
     model.addConstr(
@@ -186,12 +179,13 @@ def build_and_solve_model(df, instance_name="Instance"):
                 name=f"sep_z2_{i}_{j}"
             )
 
-    # --Solve the model--
-    model.Params.TimeLimit = 60
+    # Parameters for better performance 
+    model.Params.TimeLimit = 120
+    model.Params.MIPFocus = 1       
+    model.Params.Cuts = 2           
+    model.Params.Heuristics = 0.15 
 
-    # Hier mss nog wat parameter instellingen voor performance toevoegen
-
-    model.write(f"{instance_name}.lp")  # write full model with all constraints
+    model.write(f"{instance_name}.lp")  
     model.optimize()
 
     return model, items, take, x, y, z, lx, ly, lz
@@ -202,7 +196,7 @@ def print_solution(model, items, take, x, y, z, lx, ly, lz):
         print("No usable solution found.")
         return
 
-    print("\n================ SOLUTION ================\n")
+    print("Solution")
     print(f"Objective value: {model.ObjVal:.2f}")
     print(f"Suitcase dimensions: L={model.getVarByName('L').X:.0f}, "
           f"W={model.getVarByName('W').X:.0f}, "
@@ -238,7 +232,6 @@ def main():
         print(f"\n--- Solving {instance_name} ---")
         model, items, take, x, y, z, lx, ly, lz = build_and_solve_model(df, instance_name)
         print_solution(model, items, take, x, y, z, lx, ly, lz)
-        break
 
 
 if __name__ == "__main__":
